@@ -9,37 +9,11 @@ __version__ = "0.1.0"
 __status__ = "Development"
 
 # Import libraries
-import pygame
 import numpy as np
+import pygame
 from pygame import Rect
 from pygame.math import Vector2
-
-# Define a sample board
-header_height = 1
-board_width = 9
-board_height = 9
-
-window_width = board_width
-window_height = header_height + board_height
-
-board_visibility = np.zeros((board_width, board_height))
-board_visibility[3, 0] = 1
-board_visibility[4, 1] = 1
-board_visibility[5, 2] = 2
-
-# yapf: disable
-board_values = np.array([
-    [+1, +1, +2, +1, +1, +0, +1, +2, +2],
-    [+1, +9, +3, +9, +1, +0, +1, +9, +9],
-    [+1, +2, +9, +2, +1, +1, +2, +3, +2],
-    [+0, +1, +1, +1, +1, +2, +9, +1, +0],
-    [+1, +1, +1, +0, +1, +9, +2, +1, +0],
-    [+1, +9, +1, +0, +1, +1, +1, +1, +1],
-    [+1, +1, +1, +0, +0, +0, +0, +1, +9],
-    [+0, +0, +0, +0, +0, +0, +0, +2, +2],
-    [+0, +0, +0, +0, +0, +0, +0, +1, +9]
-])
-# yapf: enable
+from random import randint
 
 
 class MineSweeperGame:
@@ -49,44 +23,123 @@ class MineSweeperGame:
         board_texture: the game texture producer class.
     """
 
-    def __init__(self):
+    # Texture constant definition
+    CELL_EMPTY_VALUE = 0
+    CELL_MINE_VALUE = 9
+    CELL_FLAG_VALUE = 10
+    CELL_CLOSED_VALUE = 11
+
+    CELL_CLOSED_STATE = 0
+    CELL_OPEN_STATE = 1
+    CELL_BLOCKED_STATE = 2
+
+    CELL_SIZE_IN_PIXELS = 58
+
+    def __init__(self, board_width=9, board_height=9, mines_number=10):
         """Initialize the game board texture objects.
         """
+
         # Initialize the pygame module
         pygame.init()
 
+        # Define the board parameters
+        self.header_height = 1
+        self.board_width = board_width
+        self.board_height = board_height
+        self.mines_number = mines_number
+
+        self.window_width = board_width
+        self.window_height = self.header_height + board_height
+
+        # self.board_visibility = np.zeros((self.board_width, self.board_height))
+        self.board_visibility = np.ones((self.board_width, self.board_height))
+        self.board_values = np.zeros((self.board_width, self.board_height))
+
+        # Generate a random board
+        self.generate_board()
+
         # Define the rendering properties
-        self.cellSize = Vector2(58, 58)
-        self.boardSize = Vector2(window_width, window_height)
+        self.cellSize = Vector2(self.CELL_SIZE_IN_PIXELS, self.CELL_SIZE_IN_PIXELS)
+        self.boardSize = Vector2(self.window_width, self.window_height)
         self.unitsTexture = pygame.image.load("./graphics/tile_set_small.png")
 
         # Create the board window
         windowSize = self.boardSize.elementwise() * self.cellSize
         self.window = pygame.display.set_mode((int(windowSize.x), int(windowSize.y)))
-        self.window.fill((255, 255, 255))
 
         # Load and set the game icon
-        logo = pygame.image.load("./graphics/mine-icon.png")
-        pygame.display.set_icon(logo)
+        icon = pygame.image.load("./graphics/mine-icon.png")
+        pygame.display.set_icon(icon)
         pygame.display.set_caption("Minesweeper")
 
         # Define a variable to control the main loop
         self.clock = pygame.time.Clock()
         self.running = True
 
+    def generate_board(self):
+
+        # First place the required number of mines at random positions
+        remaining_mines = self.mines_number
+
+        while (remaining_mines > 0):
+
+            # Get a random position
+            line = randint(0, (self.board_height - 1))
+            column = randint(0, (self.board_width - 1))
+
+            # Place the mine in the board
+            if (self.board_values[line, column] != self.CELL_MINE_VALUE):
+                self.board_values[line, column] = self.CELL_MINE_VALUE
+                remaining_mines -= 1
+
+        # Then, iterate over the board and update the board values
+        for (line, column), value in np.ndenumerate(self.board_values):
+
+            # Skip if the position has a mine
+            if (value == self.CELL_MINE_VALUE):
+                continue
+
+            # Check each neighbor position for mines
+            mines_found = 0
+            for line_offset in range(-1, 2):
+                for column_offset in range(-1, 2):
+
+                    # Get neighbor position
+                    neighbor_line = line + line_offset
+                    neighbor_column = column + column_offset
+
+                    # Discard invalid neighbors
+                    if ((neighbor_line < 0) or (neighbor_column < 0)):
+                        continue
+                    if ((neighbor_line >= self.board_height) or (neighbor_column >= self.board_width)):
+                        continue
+                    if ((neighbor_line == line) and (neighbor_column == column)):
+                        continue
+
+                    # Check for mines
+                    if (self.board_values[neighbor_line, neighbor_column] == self.CELL_MINE_VALUE):
+                        mines_found += 1
+
+            # Update the cell value
+            self.board_values[line, column] = mines_found
+
     def render(self):
+        """Function designed to print the game board on screen.
+        """
+
         # Clear the screen area (white background)
         self.window.fill((255, 255, 255))
 
         # Print the board tiles
-        for (line, column), value in np.ndenumerate(board_values):
-            spritePoint = Vector2(column, line + header_height).elementwise() * self.cellSize
+        for (line, column), value in np.ndenumerate(self.board_values):
 
-            visibility = board_visibility[line, column]
-            if (visibility == 0):
-                texturePoint = Vector2(11, 0).elementwise() * self.cellSize
-            elif (visibility == 2):
-                texturePoint = Vector2(10, 0).elementwise() * self.cellSize
+            spritePoint = Vector2(column, line + self.header_height).elementwise() * self.cellSize
+
+            visibility = self.board_visibility[line, column]
+            if (visibility == self.CELL_CLOSED_STATE):
+                texturePoint = Vector2(self.CELL_CLOSED_VALUE, 0).elementwise() * self.cellSize
+            elif (visibility == self.CELL_BLOCKED_STATE):
+                texturePoint = Vector2(self.CELL_FLAG_VALUE, 0).elementwise() * self.cellSize
             else:
                 texturePoint = Vector2(value, 0).elementwise() * self.cellSize
 
@@ -96,6 +149,9 @@ class MineSweeperGame:
         pygame.display.update()
 
     def run(self):
+        """Function designed to run the game application.
+        """
+
         # Run the main loop
         while self.running:
 
@@ -116,8 +172,6 @@ def main():
 
     This function initializes and run the Mine Sweeper Game application.
     """
-
-    # Initialize and run the game
     game = MineSweeperGame()
     game.run()
 
