@@ -5,7 +5,7 @@
 
 __author__ = "Eloi Giacobbo"
 __email__ = "eloiluiz@gmail.com"
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __status__ = "Development"
 
 # Import libraries
@@ -35,7 +35,7 @@ class MineSweeperGame:
 
     CELL_SIZE_IN_PIXELS = 58
 
-    def __init__(self, board_width=9, board_height=9, mines_number=10):
+    def __init__(self, boardWidth=9, boardHeight=9, minesNumber=10):
         """Initialize the game board texture objects.
         """
 
@@ -43,24 +43,24 @@ class MineSweeperGame:
         pygame.init()
 
         # Define the board parameters
-        self.header_height = 1
-        self.board_width = board_width
-        self.board_height = board_height
-        self.mines_number = mines_number
+        self.headerHeight = 1
+        self.boardWidth = boardWidth
+        self.boardHeight = boardHeight
+        self.minesNumber = minesNumber
 
-        self.window_width = board_width
-        self.window_height = self.header_height + board_height
+        self.windowWidth = boardWidth
+        self.windowHeight = self.headerHeight + boardHeight
 
-        # self.board_visibility = np.zeros((self.board_width, self.board_height))
-        self.board_visibility = np.ones((self.board_width, self.board_height))
-        self.board_values = np.zeros((self.board_width, self.board_height))
+        self.boardVisibility = np.zeros((self.boardWidth, self.boardHeight))
+        # self.boardVisibility = np.ones((self.boardWidth, self.boardHeight))
+        self.boardValues = np.zeros((self.boardWidth, self.boardHeight))
 
         # Generate a random board
-        self.generate_board()
+        self.generateBoard()
 
         # Define the rendering properties
         self.cellSize = Vector2(self.CELL_SIZE_IN_PIXELS, self.CELL_SIZE_IN_PIXELS)
-        self.boardSize = Vector2(self.window_width, self.window_height)
+        self.boardSize = Vector2(self.windowWidth, self.windowHeight)
         self.unitsTexture = pygame.image.load("./graphics/tile_set_small.png")
 
         # Create the board window
@@ -76,52 +76,74 @@ class MineSweeperGame:
         self.clock = pygame.time.Clock()
         self.running = True
 
-    def generate_board(self):
+    def getNeighbors(self, line, column):
+        """Identify the selected cell neighbor positions and returns it.
+
+        Args:
+            line (int): cell line coordinate.
+            column (int): cell column coordinate.
+
+        Returns:
+            list: the list of neighbor coordinates.
+        """
+
+        neighbors = []
+
+        for lineOffset in range(-1, 2):
+            for columnOffset in range(-1, 2):
+
+                # Get neighbor position
+                neighborLine = line + lineOffset
+                neighborColumn = column + columnOffset
+
+                # Discard invalid neighbors
+                if ((neighborLine < 0) or (neighborColumn < 0)):
+                    continue
+                if ((neighborLine >= self.boardHeight) or (neighborColumn >= self.boardWidth)):
+                    continue
+                if ((neighborLine == line) and (neighborColumn == column)):
+                    continue
+
+                # Populate the neighbors list
+                neighbors.append([neighborLine, neighborColumn])
+
+        return neighbors
+
+    def generateBoard(self):
 
         # First place the required number of mines at random positions
-        remaining_mines = self.mines_number
+        remainingMines = self.minesNumber
 
-        while (remaining_mines > 0):
+        while (remainingMines > 0):
 
             # Get a random position
-            line = randint(0, (self.board_height - 1))
-            column = randint(0, (self.board_width - 1))
+            line = randint(0, (self.boardHeight - 1))
+            column = randint(0, (self.boardWidth - 1))
 
             # Place the mine in the board
-            if (self.board_values[line, column] != self.CELL_MINE_VALUE):
-                self.board_values[line, column] = self.CELL_MINE_VALUE
-                remaining_mines -= 1
+            if (self.boardValues[line, column] != self.CELL_MINE_VALUE):
+                self.boardValues[line, column] = self.CELL_MINE_VALUE
+                remainingMines -= 1
 
         # Then, iterate over the board and update the board values
-        for (line, column), value in np.ndenumerate(self.board_values):
+        for (line, column), value in np.ndenumerate(self.boardValues):
 
             # Skip if the position has a mine
             if (value == self.CELL_MINE_VALUE):
                 continue
 
             # Check each neighbor position for mines
-            mines_found = 0
-            for line_offset in range(-1, 2):
-                for column_offset in range(-1, 2):
+            minesFound = 0
+            neighbors = self.getNeighbors(line, column)
 
-                    # Get neighbor position
-                    neighbor_line = line + line_offset
-                    neighbor_column = column + column_offset
+            for (neighborLine, neighborColumn) in neighbors:
 
-                    # Discard invalid neighbors
-                    if ((neighbor_line < 0) or (neighbor_column < 0)):
-                        continue
-                    if ((neighbor_line >= self.board_height) or (neighbor_column >= self.board_width)):
-                        continue
-                    if ((neighbor_line == line) and (neighbor_column == column)):
-                        continue
-
-                    # Check for mines
-                    if (self.board_values[neighbor_line, neighbor_column] == self.CELL_MINE_VALUE):
-                        mines_found += 1
+                # Check for mines
+                if (self.boardValues[neighborLine, neighborColumn] == self.CELL_MINE_VALUE):
+                    minesFound += 1
 
             # Update the cell value
-            self.board_values[line, column] = mines_found
+            self.boardValues[line, column] = minesFound
 
     def render(self):
         """Function designed to print the game board on screen.
@@ -131,11 +153,11 @@ class MineSweeperGame:
         self.window.fill((255, 255, 255))
 
         # Print the board tiles
-        for (line, column), value in np.ndenumerate(self.board_values):
+        for (line, column), value in np.ndenumerate(self.boardValues):
 
-            spritePoint = Vector2(column, line + self.header_height).elementwise() * self.cellSize
+            spritePoint = Vector2(column, line + self.headerHeight).elementwise() * self.cellSize
 
-            visibility = self.board_visibility[line, column]
+            visibility = self.boardVisibility[line, column]
             if (visibility == self.CELL_CLOSED_STATE):
                 texturePoint = Vector2(self.CELL_CLOSED_VALUE, 0).elementwise() * self.cellSize
             elif (visibility == self.CELL_BLOCKED_STATE):
@@ -148,22 +170,104 @@ class MineSweeperGame:
 
         pygame.display.update()
 
+    def openCell(self, line, column):
+        """Open the selected cell position.
+
+        Args:
+            line (int): cell line coordinate.
+            column (int): cell column coordinate.
+        """
+
+        # First, check if the cell is still closed, then proceed opening it
+        if (self.boardVisibility[line, column] == self.CELL_CLOSED_STATE):
+
+            self.boardVisibility[line, column] = self.CELL_OPEN_STATE
+
+            # Also, if the opened cell value is zero, open it's neighbors
+            if (self.boardValues[line, column] == self.CELL_EMPTY_VALUE):
+
+                neighbors = self.getNeighbors(line, column)
+
+                for (neighborLine, neighborColumn) in neighbors:
+                    self.openCell(neighborLine, neighborColumn)
+
+    def processInput(self):
+        """Process the user input commands.
+        """
+
+        LEFT_BUTTON_INDEX = 0
+        RIGHT_BUTTON_INDEX = 2
+
+        BUTTON_X_POSITION_INDEX = 0
+        BUTTON_Y_POSITION_INDEX = 1
+
+        leftButtonEvent = False
+        rightButtonEvent = False
+        targetCell = Vector2()
+
+        # Event handling, get events from the event queue
+        for event in pygame.event.get():
+
+            # Check for the exit event condition (Window Close)
+            if (event.type == pygame.QUIT):
+                # Change the control flag to False and exit the main loop
+                self.running = False
+                break
+
+            # Check for the exit event condition (ESC Key)
+            elif (event.type == pygame.KEYDOWN):
+
+                if (event.key == pygame.K_ESCAPE):
+                    # Change the control flag to False and exit the main loop
+                    self.running = False
+                    break
+
+            # Check for click events and identify which button was pressed
+            elif (event.type == pygame.MOUSEBUTTONDOWN):
+
+                button = pygame.mouse.get_pressed()
+
+                if (button[LEFT_BUTTON_INDEX]):
+                    leftButtonEvent = True
+
+                elif (button[RIGHT_BUTTON_INDEX]):
+                    rightButtonEvent = True
+
+                mousePosition = pygame.mouse.get_pos()
+
+                targetCell.x = int(mousePosition[BUTTON_X_POSITION_INDEX] / self.CELL_SIZE_IN_PIXELS)
+                targetCell.y = int(mousePosition[BUTTON_Y_POSITION_INDEX] / self.CELL_SIZE_IN_PIXELS)
+                targetCell.y -= self.headerHeight
+
+                # TODO: remove after testing - middle mouse button will close every cell
+                if (button[1]):
+                    self.boardVisibility = np.zeros((self.boardWidth, self.boardHeight))
+
+            # Process the open cell event
+            if (leftButtonEvent == True):
+
+                leftButtonEvent == False
+                self.openCell(int(targetCell.y), int(targetCell.x))
+
+            # Process the block cell event
+            if (rightButtonEvent == True):
+
+                rightButtonEvent == False
+
+                if (self.boardVisibility[int(targetCell.y), int(targetCell.x)] == self.CELL_CLOSED_STATE):
+                    self.boardVisibility[int(targetCell.y), int(targetCell.x)] = self.CELL_BLOCKED_STATE
+
+                elif (self.boardVisibility[int(targetCell.y), int(targetCell.x)] == self.CELL_BLOCKED_STATE):
+                    self.boardVisibility[int(targetCell.y), int(targetCell.x)] = self.CELL_CLOSED_STATE
+
     def run(self):
         """Function designed to run the game application.
         """
 
         # Run the main loop
         while self.running:
-
-            # Event handling, get events from the event queue
-            for event in pygame.event.get():
-
-                # Check for the exit event condition
-                if event.type == pygame.QUIT:
-                    # Change the control flag to False and exit the main loop
-                    self.running = False
-
             self.render()
+            self.processInput()
             self.clock.tick(60)
 
 
