@@ -5,10 +5,11 @@
 
 __author__ = "Eloi Giacobbo"
 __email__ = "eloiluiz@gmail.com"
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 __status__ = "Development"
 
 # Import libraries
+import argparse
 import numpy as np
 import pygame
 from pygame import Rect
@@ -48,12 +49,15 @@ class MineSweeperGame:
         self.boardHeight = boardHeight
         self.minesNumber = minesNumber
 
+        print("Creating a board with size of " + str(boardWidth) + "x" + str(boardHeight) + " cells and " +
+              str(minesNumber) + " mines.")
+
         self.windowWidth = boardWidth
         self.windowHeight = self.headerHeight + boardHeight
 
-        self.boardVisibility = np.zeros((self.boardWidth, self.boardHeight))
-        # self.boardVisibility = np.ones((self.boardWidth, self.boardHeight))
-        self.boardValues = np.zeros((self.boardWidth, self.boardHeight))
+        self.boardVisibility = np.zeros((self.boardHeight, self.boardWidth))
+        # self.boardVisibility = np.ones((self.boardHeight, self.boardWidth))
+        self.boardValues = np.zeros((self.boardHeight, self.boardWidth))
 
         # Generate a random board
         self.generateBoard()
@@ -241,7 +245,7 @@ class MineSweeperGame:
 
                 # TODO: remove after testing - middle mouse button will close every cell
                 if (button[1]):
-                    self.boardVisibility = np.zeros((self.boardWidth, self.boardHeight))
+                    self.boardVisibility = np.zeros((self.boardHeight, self.boardWidth))
 
             # Process the open cell event
             if (leftButtonEvent == True):
@@ -271,15 +275,78 @@ class MineSweeperGame:
             self.clock.tick(60)
 
 
-def main():
+def main(args):
     """Mine Sweeper Game main function.
 
     This function initializes and run the Mine Sweeper Game application.
+
+    Args:
+        args (object): the argparse class parsed result object.
     """
-    game = MineSweeperGame()
+
+    EASY_WIDTH = 9
+    EASY_HEIGHT = 9
+    EASY_MINES = 10
+
+    MEDIUM_WIDTH = 16
+    MEDIUM_HEIGHT = 16
+    MEDIUM_MINES = 40
+
+    HARD_WIDTH = 30
+    HARD_HEIGHT = 16
+    HARD_MINES = 100
+
+    boardWidth = 0
+    boardHeight = 0
+    minesNumber = 0
+
+    # Parse the game input commands
+    if ((isinstance(args.difficulty, str) == True) and (args.difficulty != '')):
+
+        if (args.difficulty == 'medium'):
+            print("Medium difficulty selected.")
+            boardWidth = MEDIUM_WIDTH
+            boardHeight = MEDIUM_HEIGHT
+            minesNumber = MEDIUM_MINES
+
+        elif (args.difficulty == 'hard'):
+            print("Hard difficulty selected.")
+            boardWidth = HARD_WIDTH
+            boardHeight = HARD_HEIGHT
+            minesNumber = HARD_MINES
+
+        else:
+            print("Easy difficulty selected.")
+            boardWidth = EASY_WIDTH
+            boardHeight = EASY_HEIGHT
+            minesNumber = EASY_MINES
+
+    else:
+        print("Easy difficulty selected by default.")
+        boardWidth = EASY_WIDTH
+        boardHeight = EASY_HEIGHT
+        minesNumber = EASY_MINES
+
+    # Create the game instance and run
+    game = MineSweeperGame(boardWidth, boardHeight, minesNumber)
     game.run()
 
 
 # Application entry point
 if __name__ == "__main__":
-    main()
+    # Instantiate the parser
+    parser = argparse.ArgumentParser()
+
+    # Define the supported arguments
+    parser.add_argument('-d',
+                        '--difficulty',
+                        type=str,
+                        choices=['easy', 'medium', 'hard'],
+                        default='',
+                        help='Define the game difficulty')
+
+    # Parse the input arguments
+    args = parser.parse_args()
+
+    # Call the main game function
+    main(args)
