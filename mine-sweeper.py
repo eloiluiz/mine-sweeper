@@ -38,7 +38,14 @@ class MineSweeperGame:
     CELL_EXPLODED_MINE_STATE = 3
     CELL_WRONG_BLOCKED_STATE = 4
 
-    CELL_SIZE_IN_PIXELS = 58
+    HEADER_HEIGHT_IN_PIXELS = 53
+    FOOTER_HEIGHT_IN_PIXELS = 7
+    LEFT_BORDER_WIDTH_IN_PIXELS = 9
+    RIGHT_BORDER_WIDTH_IN_PIXELS = 8
+
+    DISPLAY_WIDTH_IN_PIXELS = 13
+    DISPLAY_HEIGHT_IN_PIXELS = 23
+    CELL_SIZE_IN_PIXELS = 16
 
     def __init__(self, boardWidth=9, boardHeight=9, minesNumber=10):
         """Initialize the game board texture objects.
@@ -48,7 +55,6 @@ class MineSweeperGame:
         pygame.init()
 
         # Define the board parameters
-        self.headerHeight = 1
         self.boardWidth = boardWidth
         self.boardHeight = boardHeight
         self.minesNumber = minesNumber
@@ -56,29 +62,43 @@ class MineSweeperGame:
         print("Creating a board with size of " + str(boardWidth) + "x" + str(boardHeight) + " cells and " +
               str(minesNumber) + " mines.")
 
-        self.windowWidth = boardWidth
-        self.windowHeight = self.headerHeight + boardHeight
-
-        self.boardVisibility = np.zeros((self.boardHeight, self.boardWidth))
-        # self.boardVisibility = np.ones((self.boardHeight, self.boardWidth))
-        self.boardValues = np.zeros((self.boardHeight, self.boardWidth))
-
         # Define the rendering properties
+        self.windowWidth = self.LEFT_BORDER_WIDTH_IN_PIXELS
+        self.windowWidth += (boardWidth * self.CELL_SIZE_IN_PIXELS)
+        self.windowWidth += self.RIGHT_BORDER_WIDTH_IN_PIXELS
+
+        self.windowHeight = self.HEADER_HEIGHT_IN_PIXELS
+        self.windowHeight += (boardHeight * self.CELL_SIZE_IN_PIXELS)
+        self.windowHeight += self.FOOTER_HEIGHT_IN_PIXELS
+
+        self.windowSize = Vector2(self.windowWidth, self.windowHeight)
+
+        self.displaySize = Vector2(self.DISPLAY_WIDTH_IN_PIXELS, self.DISPLAY_HEIGHT_IN_PIXELS)
+        self.displaySprite = pygame.image.load("./graphics/7-seg-sprite.png")
+
         self.cellSize = Vector2(self.CELL_SIZE_IN_PIXELS, self.CELL_SIZE_IN_PIXELS)
-        self.boardSize = Vector2(self.windowWidth, self.windowHeight)
-        self.unitsTexture = pygame.image.load("./graphics/tile_set_small.png")
+        self.cellSprite = pygame.image.load("./graphics/cell-sprite.png")
 
         # Create the board window
-        windowSize = self.boardSize.elementwise() * self.cellSize
-        self.window = pygame.display.set_mode((int(windowSize.x), int(windowSize.y)))
+        self.window = pygame.display.set_mode((int(self.windowSize.x), int(self.windowSize.y)))
 
         # Load and set the game icon
         icon = pygame.image.load("./graphics/mine-icon.png")
         pygame.display.set_icon(icon)
         pygame.display.set_caption("Minesweeper")
 
+        # Print the board background
+        self.renderBackground()
+
+        # Initialize the board values
+        self.boardVisibility = np.zeros((self.boardHeight, self.boardWidth))
+        # self.boardVisibility = np.ones((self.boardHeight, self.boardWidth))
+        self.boardValues = np.zeros((self.boardHeight, self.boardWidth))
+
+        # Define the game time system
+        self.match_start_time_ms = pygame.time.get_ticks()
+
         # Define the control variables
-        self.clock = pygame.time.Clock()
         self.running = True
         self.is_first_click = True
         self.match_ongoing = True
@@ -174,17 +194,91 @@ class MineSweeperGame:
             # Update the cell value
             self.boardValues[line, column] = minesFound
 
+    def renderBackground(self):
+        """Function designed to print the game board background on screen.
+        """
+
+        # Clear the screen area (gray background)
+        self.window.fill((192, 192, 192))
+
+        # Load the background sprites
+        backgroundSprite = pygame.image.load("./graphics/background-sprite.png")
+
+        # Print the borders
+        for x in range(self.LEFT_BORDER_WIDTH_IN_PIXELS, self.windowWidth - self.RIGHT_BORDER_WIDTH_IN_PIXELS + 1):
+            spritePoint = Vector2(x, 0)
+            texturePoint = Vector2(59, 0)
+            textureRect = Rect(int(texturePoint.x), int(texturePoint.y), int(1), int(self.HEADER_HEIGHT_IN_PIXELS))
+            self.window.blit(backgroundSprite, spritePoint, textureRect)
+
+        for x in range(self.LEFT_BORDER_WIDTH_IN_PIXELS, self.windowWidth - self.RIGHT_BORDER_WIDTH_IN_PIXELS + 1):
+            borderPosition = self.windowHeight - self.FOOTER_HEIGHT_IN_PIXELS
+            spritePoint = Vector2(x, borderPosition)
+            texturePoint = Vector2(11, 56)
+            textureRect = Rect(int(texturePoint.x), int(texturePoint.y), int(1), int(self.FOOTER_HEIGHT_IN_PIXELS))
+            self.window.blit(backgroundSprite, spritePoint, textureRect)
+
+        for y in range(self.HEADER_HEIGHT_IN_PIXELS, self.windowHeight - self.FOOTER_HEIGHT_IN_PIXELS + 1):
+            spritePoint = Vector2(0, y)
+            texturePoint = Vector2(0, 54)
+            textureRect = Rect(int(texturePoint.x), int(texturePoint.y), int(self.LEFT_BORDER_WIDTH_IN_PIXELS), int(1))
+            self.window.blit(backgroundSprite, spritePoint, textureRect)
+
+        for y in range(self.HEADER_HEIGHT_IN_PIXELS, self.windowHeight - self.FOOTER_HEIGHT_IN_PIXELS + 3):
+            borderPosition = self.windowWidth - self.RIGHT_BORDER_WIDTH_IN_PIXELS
+            spritePoint = Vector2(borderPosition, y)
+            texturePoint = Vector2(143, 54)
+            textureRect = Rect(int(texturePoint.x), int(texturePoint.y), int(self.RIGHT_BORDER_WIDTH_IN_PIXELS), int(1))
+            self.window.blit(backgroundSprite, spritePoint, textureRect)
+
+        borderPosition = self.windowHeight - self.FOOTER_HEIGHT_IN_PIXELS
+        spritePoint = Vector2(0, borderPosition)
+        texturePoint = Vector2(0, 56)
+        textureRect = Rect(int(texturePoint.x), int(texturePoint.y), int(self.LEFT_BORDER_WIDTH_IN_PIXELS), int(self.FOOTER_HEIGHT_IN_PIXELS))
+        self.window.blit(backgroundSprite, spritePoint, textureRect)
+
+        # Print the header
+        spritePoint = Vector2(0, 0)
+        texturePoint = Vector2(0, 0)
+        textureRect = Rect(int(texturePoint.x), int(texturePoint.y), int(58), int(53))
+        self.window.blit(backgroundSprite, spritePoint, textureRect)
+
+        smilePosition = (self.windowWidth / 2) - 13
+        spritePoint = Vector2(smilePosition, 0)
+        texturePoint = Vector2(61, 0)
+        textureRect = Rect(int(texturePoint.x), int(texturePoint.y), int(27), int(53))
+        self.window.blit(backgroundSprite, spritePoint, textureRect)
+
+        spritePoint = Vector2(self.windowWidth - 58, 0)
+        texturePoint = Vector2(93, 0)
+        textureRect = Rect(int(texturePoint.x), int(texturePoint.y), int(58), int(53))
+        self.window.blit(backgroundSprite, spritePoint, textureRect)
+
     def render(self):
         """Function designed to print the game board on screen.
         """
+        # Print the match running time
+        if (self.match_ongoing == True):
+            self.match_time_ms = (pygame.time.get_ticks() - self.match_start_time_ms)
 
-        # Clear the screen area (white background)
-        self.window.fill((255, 255, 255))
+        # Calculate the match time
+        match_time_s = int(self.match_time_ms / 1000)
+        digits = [int(match_time_s % 10), int((match_time_s % 100) / 10), int(match_time_s / 100)]
+
+        # Print each display digit on screen
+        for index, digit in enumerate(digits):
+            digitPosition = self.windowWidth - 28 - (index * 13)
+            spritePoint = Vector2(digitPosition, 15)
+            texturePoint = Vector2(digit, 0).elementwise() * self.displaySize
+            textureRect = Rect(int(texturePoint.x), int(texturePoint.y), int(self.displaySize.x),
+                               int(self.displaySize.y))
+            self.window.blit(self.displaySprite, spritePoint, textureRect)
 
         # Print the board tiles
         for (line, column), value in np.ndenumerate(self.boardValues):
 
-            spritePoint = Vector2(column, line + self.headerHeight).elementwise() * self.cellSize
+            spriteOffset = Vector2(self.LEFT_BORDER_WIDTH_IN_PIXELS, self.HEADER_HEIGHT_IN_PIXELS)
+            spritePoint = (Vector2(column, line).elementwise() * self.cellSize) + spriteOffset
 
             visibility = self.boardVisibility[line, column]
             if (visibility == self.CELL_CLOSED_STATE):
@@ -199,7 +293,7 @@ class MineSweeperGame:
                 texturePoint = Vector2(value, 0).elementwise() * self.cellSize
 
             textureRect = Rect(int(texturePoint.x), int(texturePoint.y), int(self.cellSize.x), int(self.cellSize.y))
-            self.window.blit(self.unitsTexture, spritePoint, textureRect)
+            self.window.blit(self.cellSprite, spritePoint, textureRect)
 
         pygame.display.update()
 
@@ -258,6 +352,7 @@ class MineSweeperGame:
                 self.boardVisibility[line, column] = self.CELL_BLOCKED_STATE
 
         # Indicate the victory
+        self.match_time_ms = (pygame.time.get_ticks() - self.match_start_time_ms)
         self.match_ongoing = False
         self.match_win = True
 
@@ -305,13 +400,17 @@ class MineSweeperGame:
 
                 mousePosition = pygame.mouse.get_pos()
 
-                targetCell.x = int(mousePosition[BUTTON_X_POSITION_INDEX] / self.CELL_SIZE_IN_PIXELS)
-                targetCell.y = int(mousePosition[BUTTON_Y_POSITION_INDEX] / self.CELL_SIZE_IN_PIXELS)
-                targetCell.y -= self.headerHeight
+                targetCell.x = (mousePosition[BUTTON_X_POSITION_INDEX] - self.LEFT_BORDER_WIDTH_IN_PIXELS)
+                targetCell.x = int(targetCell.x / self.CELL_SIZE_IN_PIXELS)
+                targetCell.y = (mousePosition[BUTTON_Y_POSITION_INDEX] - self.HEADER_HEIGHT_IN_PIXELS)
+                targetCell.y = int(targetCell.y / self.CELL_SIZE_IN_PIXELS)
 
                 # TODO: remove after testing - middle mouse button will close every cell
                 if (button[1]):
+                    # Reset the board
                     self.boardVisibility = np.zeros((self.boardHeight, self.boardWidth))
+                    # Reset the control variables
+                    self.match_start_time_ms = pygame.time.get_ticks()
                     self.match_ongoing = True
                     self.match_win = False
 
@@ -342,6 +441,7 @@ class MineSweeperGame:
                     self.boardVisibility[targetLine, targetColumn] = self.CELL_EXPLODED_MINE_STATE
                     self.openMines()
                     # End the match (defeat)
+                    self.match_time_ms = (pygame.time.get_ticks() - self.match_start_time_ms)
                     self.match_ongoing = False
                     self.match_win = False
 
@@ -377,7 +477,6 @@ class MineSweeperGame:
         while self.running:
             self.render()
             self.processInput()
-            self.clock.tick(60)
 
 
 def main(args):
