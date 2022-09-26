@@ -5,7 +5,7 @@
 
 __author__ = "Eloi Giacobbo"
 __email__ = "eloiluiz@gmail.com"
-__version__ = "0.3.1"
+__version__ = "0.3.2"
 __status__ = "Development"
 
 # Import libraries
@@ -234,7 +234,8 @@ class MineSweeperGame:
         borderPosition = self.windowHeight - self.FOOTER_HEIGHT_IN_PIXELS
         spritePoint = Vector2(0, borderPosition)
         texturePoint = Vector2(0, 56)
-        textureRect = Rect(int(texturePoint.x), int(texturePoint.y), int(self.LEFT_BORDER_WIDTH_IN_PIXELS), int(self.FOOTER_HEIGHT_IN_PIXELS))
+        textureRect = Rect(int(texturePoint.x), int(texturePoint.y), int(self.LEFT_BORDER_WIDTH_IN_PIXELS),
+                           int(self.FOOTER_HEIGHT_IN_PIXELS))
         self.window.blit(backgroundSprite, spritePoint, textureRect)
 
         # Print the header
@@ -355,6 +356,11 @@ class MineSweeperGame:
         self.match_time_ms = (pygame.time.get_ticks() - self.match_start_time_ms)
         self.match_ongoing = False
         self.match_win = True
+        print("Game Over. You Win!")
+
+        # Calculate the score and display
+        self.match_score = int((self.minesNumber * 100) / (self.match_time_ms / 1000))
+        print("Match Score = " + str(self.match_score) + " points!")
 
     def processInput(self):
         """Process the user input commands.
@@ -444,6 +450,7 @@ class MineSweeperGame:
                     self.match_time_ms = (pygame.time.get_ticks() - self.match_start_time_ms)
                     self.match_ongoing = False
                     self.match_win = False
+                    print("Game Over. You Lose!")
 
                 # Otherwise, open the cell as usual
                 else:
