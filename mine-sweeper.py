@@ -5,7 +5,7 @@
 
 __author__ = "Eloi Giacobbo"
 __email__ = "eloiluiz@gmail.com"
-__version__ = "0.4.1"
+__version__ = "0.4.2"
 __status__ = "Development"
 
 # Import libraries
@@ -18,10 +18,7 @@ from pygame.math import Vector2
 
 
 class MineSweeperGame:
-    """Mine Sweeper Game board texture definition class.
-
-    Returns:
-        board_texture: the game texture producer class.
+    """Mine Sweeper Game class
     """
 
     # Texture constant definition
@@ -31,12 +28,17 @@ class MineSweeperGame:
     CELL_CLOSED_VALUE = 11
     CELL_EXPLODED_MINE_VALUE = 12
     CELL_WRONG_FLAG_VALUE = 13
+    CELL_QUESTION_MARKED_VALUE = 14
+    CELL_PRESSED_QUESTION_MARKED_VALUE = 15
 
     CELL_CLOSED_STATE = 0
     CELL_OPEN_STATE = 1
     CELL_BLOCKED_STATE = 2
     CELL_EXPLODED_MINE_STATE = 3
     CELL_WRONG_BLOCKED_STATE = 4
+    CELL_MARKED_STATE = 5
+    CELL_PRESSED_MARKED_STATE = 6
+    CELL_PRESSED_CLOSED_STATE = 7
 
     HEADER_HEIGHT_IN_PIXELS = 53
     FOOTER_HEIGHT_IN_PIXELS = 7
@@ -97,13 +99,18 @@ class MineSweeperGame:
         self.boardValues = np.zeros((self.boardHeight, self.boardWidth))
 
         # Define the game time system
-        self.match_start_time_ms = pygame.time.get_ticks()
+        self.matchStartTimeMs = pygame.time.get_ticks()
+
+        # Define the input event variables
+        self.isFirstClick = True
+        self.leftButtonState = False
+        self.rightButtonState = False
+        self.targetCell = Vector2()
 
         # Define the control variables
         self.running = True
-        self.is_first_click = True
-        self.match_ongoing = True
-        self.match_win = False
+        self.matchOngoing = True
+        self.matchWin = False
 
     def getNeighbors(self, line, column):
         """Identify the selected cell neighbor positions and returns it.
@@ -169,6 +176,11 @@ class MineSweeperGame:
             # Place the mine in the board
             if (len(columnList) > 0):
                 column = int(random.choice(columnList))
+
+                # Skip if matched the initial position
+                if ((initialLine == line) and (initialColumn == column)):
+                    continue
+
                 self.boardValues[line, column] = self.CELL_MINE_VALUE
                 remainingMines -= 1
 
@@ -261,7 +273,7 @@ class MineSweeperGame:
         mineCounter = self.minesUndiscovered
         if (mineCounter < 0):
             mineCounter = 0
-        
+
         digits = [int(mineCounter / 100), int((mineCounter % 100) / 10), int(mineCounter % 10)]
 
         for index, digit in enumerate(digits):
@@ -273,12 +285,12 @@ class MineSweeperGame:
             self.window.blit(self.displaySprite, spritePoint, textureRect)
 
         # Print the match running time
-        if (self.match_ongoing == True):
-            self.match_time_ms = (pygame.time.get_ticks() - self.match_start_time_ms)
+        if (self.matchOngoing == True):
+            self.matchTimeMs = (pygame.time.get_ticks() - self.matchStartTimeMs)
 
         # Calculate the match time
-        match_time_s = int(self.match_time_ms / 1000)
-        digits = [int(match_time_s % 10), int((match_time_s % 100) / 10), int(match_time_s / 100)]
+        matchTimeS = int(self.matchTimeMs / 1000)
+        digits = [int(matchTimeS % 10), int((matchTimeS % 100) / 10), int(matchTimeS / 100)]
 
         # Print each display digit on screen
         for index, digit in enumerate(digits):
@@ -304,6 +316,12 @@ class MineSweeperGame:
                 texturePoint = Vector2(self.CELL_EXPLODED_MINE_VALUE, 0).elementwise() * self.cellSize
             elif (visibility == self.CELL_WRONG_BLOCKED_STATE):
                 texturePoint = Vector2(self.CELL_WRONG_FLAG_VALUE, 0).elementwise() * self.cellSize
+            elif ((visibility == self.CELL_MARKED_STATE)):
+                texturePoint = Vector2(self.CELL_QUESTION_MARKED_VALUE, 0).elementwise() * self.cellSize
+            elif ((visibility == self.CELL_PRESSED_MARKED_STATE)):
+                texturePoint = Vector2(self.CELL_PRESSED_QUESTION_MARKED_VALUE, 0).elementwise() * self.cellSize
+            elif ((visibility == self.CELL_PRESSED_CLOSED_STATE)):
+                texturePoint = Vector2(self.CELL_EMPTY_VALUE, 0).elementwise() * self.cellSize
             else:
                 texturePoint = Vector2(value, 0).elementwise() * self.cellSize
 
@@ -366,15 +384,18 @@ class MineSweeperGame:
             if (value == self.CELL_MINE_VALUE):
                 self.boardVisibility[line, column] = self.CELL_BLOCKED_STATE
 
+        # Indicate every mine was discovered
+        self.minesUndiscovered = 0
+
         # Indicate the victory
-        self.match_time_ms = (pygame.time.get_ticks() - self.match_start_time_ms)
-        self.match_ongoing = False
-        self.match_win = True
+        self.matchTimeMs = (pygame.time.get_ticks() - self.matchStartTimeMs)
+        self.matchOngoing = False
+        self.matchWin = True
         print("Game Over. You Win!")
 
         # Calculate the score and display
-        self.match_score = int((self.minesNumber * 100) / (self.match_time_ms / 1000))
-        print("Match Score = " + str(self.match_score) + " points!")
+        self.matchScore = int((self.minesNumber * 100) / (self.matchTimeMs / 1000))
+        print("Match Score = " + str(self.matchScore) + " points!")
 
     def processInput(self):
         """Process the user input commands.
@@ -388,7 +409,6 @@ class MineSweeperGame:
 
         leftButtonEvent = False
         rightButtonEvent = False
-        targetCell = Vector2()
 
         # Event handling, get events from the event queue
         for event in pygame.event.get():
@@ -412,75 +432,114 @@ class MineSweeperGame:
 
                 button = pygame.mouse.get_pressed()
 
-                if (button[LEFT_BUTTON_INDEX]):
+                if ((button[LEFT_BUTTON_INDEX] == True) and (self.leftButtonState == False)):
                     leftButtonEvent = True
+                    self.leftButtonState = True
 
-                elif (button[RIGHT_BUTTON_INDEX]):
+                if ((button[RIGHT_BUTTON_INDEX] == True) and (self.rightButtonState == False)):
                     rightButtonEvent = True
+                    self.rightButtonState = True
 
                 mousePosition = pygame.mouse.get_pos()
 
-                targetCell.x = (mousePosition[BUTTON_X_POSITION_INDEX] - self.LEFT_BORDER_WIDTH_IN_PIXELS)
-                targetCell.x = int(targetCell.x / self.CELL_SIZE_IN_PIXELS)
-                targetCell.y = (mousePosition[BUTTON_Y_POSITION_INDEX] - self.HEADER_HEIGHT_IN_PIXELS)
-                targetCell.y = int(targetCell.y / self.CELL_SIZE_IN_PIXELS)
+                self.targetCell.x = (mousePosition[BUTTON_X_POSITION_INDEX] - self.LEFT_BORDER_WIDTH_IN_PIXELS)
+                self.targetCell.x = int(self.targetCell.x / self.CELL_SIZE_IN_PIXELS)
+                self.targetCell.y = (mousePosition[BUTTON_Y_POSITION_INDEX] - self.HEADER_HEIGHT_IN_PIXELS)
+                self.targetCell.y = int(self.targetCell.y / self.CELL_SIZE_IN_PIXELS)
 
                 # TODO: remove after testing - middle mouse button will close every cell
                 if (button[1]):
                     # Reset the board
                     self.boardVisibility = np.zeros((self.boardHeight, self.boardWidth))
                     # Reset the control variables
-                    self.match_start_time_ms = pygame.time.get_ticks()
-                    self.match_ongoing = True
-                    self.match_win = False
+                    self.matchStartTimeMs = pygame.time.get_ticks()
+                    self.matchOngoing = True
+                    self.matchWin = False
+
+            # Check for release events and identify which button was released
+            elif (event.type == pygame.MOUSEBUTTONUP):
+
+                button = pygame.mouse.get_pressed()
+
+                if ((button[LEFT_BUTTON_INDEX] == False) and (self.leftButtonState == True)):
+                    leftButtonEvent = True
+                    self.leftButtonState = False
+
+                if ((button[RIGHT_BUTTON_INDEX] == False) and (self.rightButtonState == True)):
+                    rightButtonEvent = True
+                    self.rightButtonState = False
 
             # In case the match has already ended, skip the game button actions
-            if (self.match_ongoing == False):
+            if (self.matchOngoing == False):
                 continue
 
             # Cast the target coordinated to integers
-            targetLine = int(targetCell.y)
-            targetColumn = int(targetCell.x)
+            targetLine = int(self.targetCell.y)
+            targetColumn = int(self.targetCell.x)
 
-            # Process the open cell event
-            if (leftButtonEvent == True):
+            # Process the button press events
+            if ((leftButtonEvent == True) and (self.leftButtonState == True)):
 
-                leftButtonEvent == False
+                leftButtonEvent = False
+
+                if (self.boardVisibility[targetLine, targetColumn] == self.CELL_CLOSED_STATE):
+                    self.boardVisibility[targetLine, targetColumn] = self.CELL_PRESSED_CLOSED_STATE
+
+                if (self.boardVisibility[targetLine, targetColumn] == self.CELL_MARKED_STATE):
+                    self.boardVisibility[targetLine, targetColumn] = self.CELL_PRESSED_MARKED_STATE
+
+            if ((rightButtonEvent == True) and (self.rightButtonState == True)):
+
+                rightButtonEvent = False
+
+            # Process the open cell event at button release
+            if ((leftButtonEvent == True) and (self.leftButtonState == False)):
+
+                leftButtonEvent = False
 
                 # In case this is the first click for the match, generate the board
-                if (self.is_first_click == True):
-                    self.is_first_click = False
+                if (self.isFirstClick == True):
+                    self.isFirstClick = False
                     self.generateBoard(targetLine, targetColumn)
                     self.openCell(targetLine, targetColumn, True)
                     continue
 
                 # Next, check if the opened cell is a mine
                 value = self.boardValues[targetLine, targetColumn]
-                if (value == self.CELL_MINE_VALUE):
-                    # Explode the selected mine and open every other
-                    self.boardVisibility[targetLine, targetColumn] = self.CELL_EXPLODED_MINE_STATE
-                    self.openMines()
-                    # End the match (defeat)
-                    self.match_time_ms = (pygame.time.get_ticks() - self.match_start_time_ms)
-                    self.match_ongoing = False
-                    self.match_win = False
-                    print("Game Over. You Lose!")
 
-                # Otherwise, open the cell as usual
-                else:
-                    self.openCell(targetLine, targetColumn, False)
+                if (self.boardVisibility[targetLine, targetColumn] == self.CELL_PRESSED_CLOSED_STATE):
+                    # Process the closed cell event
 
-                # Lastly, check if the game has ended in victory
-                self.checkVictory()
+                    if (value == self.CELL_MINE_VALUE):
+                        # If the selected cell is a mine, explode it and open every other
+                        self.boardVisibility[targetLine, targetColumn] = self.CELL_EXPLODED_MINE_STATE
+                        self.openMines()
+                        # End the match (defeat)
+                        self.matchTimeMs = (pygame.time.get_ticks() - self.matchStartTimeMs)
+                        self.matchOngoing = False
+                        self.matchWin = False
+                        print("Game Over. You Lose!")
 
-            # Process the block cell event
-            if (rightButtonEvent == True):
+                    else:
+                        # Otherwise, open the cell as usual
+                        self.boardVisibility[targetLine, targetColumn] = self.CELL_CLOSED_STATE
+                        self.openCell(targetLine, targetColumn, False)
 
-                rightButtonEvent == False
+                    # And, check if the game has ended in victory
+                    self.checkVictory()
+
+                if (self.boardVisibility[targetLine, targetColumn] == self.CELL_PRESSED_MARKED_STATE):
+                    # Process the marked cell event
+                    self.boardVisibility[targetLine, targetColumn] = self.CELL_MARKED_STATE
+
+            # Process the block cell event at button release
+            if ((rightButtonEvent == True) and (self.rightButtonState == False)):
+
+                rightButtonEvent = False
 
                 # In case this is the first click for the match, generate the board
-                if (self.is_first_click == True):
-                    self.is_first_click = False
+                if (self.isFirstClick == True):
+                    self.isFirstClick = False
                     self.generateBoard(targetLine, targetColumn)
 
                 # Next, process the event
@@ -489,8 +548,11 @@ class MineSweeperGame:
                     self.minesUndiscovered -= 1
 
                 elif (self.boardVisibility[targetLine, targetColumn] == self.CELL_BLOCKED_STATE):
-                    self.boardVisibility[targetLine, targetColumn] = self.CELL_CLOSED_STATE
+                    self.boardVisibility[targetLine, targetColumn] = self.CELL_MARKED_STATE
                     self.minesUndiscovered += 1
+
+                elif (self.boardVisibility[targetLine, targetColumn] == self.CELL_MARKED_STATE):
+                    self.boardVisibility[targetLine, targetColumn] = self.CELL_CLOSED_STATE
 
     def run(self):
         """Function designed to run the game application.
