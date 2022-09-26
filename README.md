@@ -27,3 +27,22 @@ This game was developed with some command options for game customization. For mo
 ```
 python mine-sweeper.py -h
 ```
+
+## Release Notes
+
+### Release V0.3 - Development
+In version V0.2, board size customization and time tracking capabilities were added to the game.
+Additionally, in this version endgame decision conditions and a major improvement in its graphics have been implemented.
+
+![Release V0.3](/release/Mine-Sweeper%20-%20V0.3.png "Release V0.3")
+
+### Release V0.2 - Development
+In version V0.2, the ability to receive user input, through the mouse, was incorporated into the software to perform actions to discover and block positions on the board.
+
+![Release V0.2](/release/Mine-Sweeper%20-%20V0.2.png "Release V0.2")
+
+### Release V0.1 - Development
+Game initial version released for testing.
+Random creation and board preview features released.
+
+![Release V0.1](/release/Mine-Sweeper%20-%20V0.1.png "Release V0.1")

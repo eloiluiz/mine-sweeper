@@ -5,7 +5,7 @@
 
 __author__ = "Eloi Giacobbo"
 __email__ = "eloiluiz@gmail.com"
-__version__ = "0.3.2"
+__version__ = "0.4.1"
 __status__ = "Development"
 
 # Import libraries
@@ -58,6 +58,7 @@ class MineSweeperGame:
         self.boardWidth = boardWidth
         self.boardHeight = boardHeight
         self.minesNumber = minesNumber
+        self.minesUndiscovered = minesNumber
 
         print("Creating a board with size of " + str(boardWidth) + "x" + str(boardHeight) + " cells and " +
               str(minesNumber) + " mines.")
@@ -151,9 +152,6 @@ class MineSweeperGame:
         # Reset the board state
         self.boardVisibility = np.zeros((self.boardHeight, self.boardWidth))
         self.boardValues = np.zeros((self.boardHeight, self.boardWidth))
-
-        # Open the initial position
-        self.boardVisibility[initialLine, initialColumn] = self.CELL_OPEN_STATE
 
         # Place the required number of mines at random positions
         remainingMines = self.minesNumber
@@ -258,6 +256,22 @@ class MineSweeperGame:
     def render(self):
         """Function designed to print the game board on screen.
         """
+
+        # Print the number of undiscovered mines
+        mineCounter = self.minesUndiscovered
+        if (mineCounter < 0):
+            mineCounter = 0
+        
+        digits = [int(mineCounter / 100), int((mineCounter % 100) / 10), int(mineCounter % 10)]
+
+        for index, digit in enumerate(digits):
+            digitPosition = 14 + (index * 13)
+            spritePoint = Vector2(digitPosition, 14)
+            texturePoint = Vector2(digit, 0).elementwise() * self.displaySize
+            textureRect = Rect(int(texturePoint.x), int(texturePoint.y), int(self.displaySize.x),
+                               int(self.displaySize.y))
+            self.window.blit(self.displaySprite, spritePoint, textureRect)
+
         # Print the match running time
         if (self.match_ongoing == True):
             self.match_time_ms = (pygame.time.get_ticks() - self.match_start_time_ms)
@@ -269,7 +283,7 @@ class MineSweeperGame:
         # Print each display digit on screen
         for index, digit in enumerate(digits):
             digitPosition = self.windowWidth - 28 - (index * 13)
-            spritePoint = Vector2(digitPosition, 15)
+            spritePoint = Vector2(digitPosition, 14)
             texturePoint = Vector2(digit, 0).elementwise() * self.displaySize
             textureRect = Rect(int(texturePoint.x), int(texturePoint.y), int(self.displaySize.x),
                                int(self.displaySize.y))
@@ -472,9 +486,11 @@ class MineSweeperGame:
                 # Next, process the event
                 if (self.boardVisibility[targetLine, targetColumn] == self.CELL_CLOSED_STATE):
                     self.boardVisibility[targetLine, targetColumn] = self.CELL_BLOCKED_STATE
+                    self.minesUndiscovered -= 1
 
                 elif (self.boardVisibility[targetLine, targetColumn] == self.CELL_BLOCKED_STATE):
                     self.boardVisibility[targetLine, targetColumn] = self.CELL_CLOSED_STATE
+                    self.minesUndiscovered += 1
 
     def run(self):
         """Function designed to run the game application.
