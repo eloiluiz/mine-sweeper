@@ -5,7 +5,7 @@
 
 __author__ = "Eloi Giacobbo"
 __email__ = "eloiluiz@gmail.com"
-__version__ = "0.4.2"
+__version__ = "0.4.3"
 __status__ = "Development"
 
 # Import libraries
@@ -47,6 +47,10 @@ class MineSweeperGame:
 
     DISPLAY_WIDTH_IN_PIXELS = 13
     DISPLAY_HEIGHT_IN_PIXELS = 23
+
+    SMILE_WIDTH_IN_PIXELS = 26
+    SMILE_HEIGHT_IN_PIXELS = 26
+
     CELL_SIZE_IN_PIXELS = 16
 
     def __init__(self, boardWidth=9, boardHeight=9, minesNumber=10):
@@ -79,6 +83,11 @@ class MineSweeperGame:
         self.displaySize = Vector2(self.DISPLAY_WIDTH_IN_PIXELS, self.DISPLAY_HEIGHT_IN_PIXELS)
         self.displaySprite = pygame.image.load("./graphics/7-seg-sprite.png")
 
+        self.smilePositionX = (self.windowWidth / 2) - (self.SMILE_WIDTH_IN_PIXELS / 2) + 1
+        self.smilePositionY = 12
+        self.smileSize = Vector2(self.SMILE_WIDTH_IN_PIXELS, self.SMILE_HEIGHT_IN_PIXELS)
+        self.smileSprite = pygame.image.load("./graphics/smile-sprite.png")
+
         self.cellSize = Vector2(self.CELL_SIZE_IN_PIXELS, self.CELL_SIZE_IN_PIXELS)
         self.cellSprite = pygame.image.load("./graphics/cell-sprite.png")
 
@@ -105,6 +114,7 @@ class MineSweeperGame:
         self.isFirstClick = True
         self.leftButtonState = False
         self.rightButtonState = False
+        self.smileButtonState = False
         self.targetCell = Vector2()
 
         # Define the control variables
@@ -284,6 +294,21 @@ class MineSweeperGame:
                                int(self.displaySize.y))
             self.window.blit(self.displaySprite, spritePoint, textureRect)
 
+        # Print the smile button
+        smileIndex = 0
+        if (self.matchOngoing == False):
+            if (self.matchWin == True):
+                smileIndex = 3
+            else:
+                smileIndex = 4
+        elif (self.leftButtonState == True):
+            smileIndex = 2
+
+        spritePoint = Vector2(self.smilePositionX, self.smilePositionY)
+        texturePoint = Vector2(smileIndex, 0).elementwise() * self.smileSize
+        textureRect = Rect(int(texturePoint.x), int(texturePoint.y), int(self.smileSize.x), int(self.smileSize.y))
+        self.window.blit(self.smileSprite, spritePoint, textureRect)
+
         # Print the match running time
         if (self.matchOngoing == True):
             self.matchTimeMs = (pygame.time.get_ticks() - self.matchStartTimeMs)
@@ -376,13 +401,19 @@ class MineSweeperGame:
 
             visibility = self.boardVisibility[line, column]
 
-            if ((visibility == self.CELL_CLOSED_STATE) and (value < self.CELL_MINE_VALUE)):
+            # If there is any flag without mines, continue
+            if ((visibility == self.CELL_BLOCKED_STATE) and (value != self.CELL_MINE_VALUE)):
                 return
 
-        # Block (flag) every mine position
+            if ((visibility == self.CELL_CLOSED_STATE) and (value == self.CELL_MINE_VALUE)):
+                return
+
+        # Block (flag) every mine position and open undiscovered numbers
         for (line, column), value in np.ndenumerate(self.boardValues):
             if (value == self.CELL_MINE_VALUE):
                 self.boardVisibility[line, column] = self.CELL_BLOCKED_STATE
+            elif (value < self.CELL_MINE_VALUE):
+                self.boardVisibility[line, column] = self.CELL_OPEN_STATE
 
         # Indicate every mine was discovered
         self.minesUndiscovered = 0
@@ -413,6 +444,8 @@ class MineSweeperGame:
         # Event handling, get events from the event queue
         for event in pygame.event.get():
 
+            boardEvent = False
+
             # Check for the exit event condition (Window Close)
             if (event.type == pygame.QUIT):
                 # Change the control flag to False and exit the main loop
@@ -442,10 +475,35 @@ class MineSweeperGame:
 
                 mousePosition = pygame.mouse.get_pos()
 
-                self.targetCell.x = (mousePosition[BUTTON_X_POSITION_INDEX] - self.LEFT_BORDER_WIDTH_IN_PIXELS)
-                self.targetCell.x = int(self.targetCell.x / self.CELL_SIZE_IN_PIXELS)
-                self.targetCell.y = (mousePosition[BUTTON_Y_POSITION_INDEX] - self.HEADER_HEIGHT_IN_PIXELS)
-                self.targetCell.y = int(self.targetCell.y / self.CELL_SIZE_IN_PIXELS)
+                # First, check if the click event is inside the board boundaries
+                if ((mousePosition[BUTTON_Y_POSITION_INDEX] >= self.HEADER_HEIGHT_IN_PIXELS) and
+                    (mousePosition[BUTTON_Y_POSITION_INDEX] < (self.windowHeight - self.FOOTER_HEIGHT_IN_PIXELS)) and
+                    (mousePosition[BUTTON_X_POSITION_INDEX] >= self.LEFT_BORDER_WIDTH_IN_PIXELS) and
+                    (mousePosition[BUTTON_X_POSITION_INDEX] < (self.windowWidth - self.RIGHT_BORDER_WIDTH_IN_PIXELS))):
+
+                    boardEvent = True
+
+                    # Then, calculate the cell position
+                    self.targetCell.x = (mousePosition[BUTTON_X_POSITION_INDEX] - self.LEFT_BORDER_WIDTH_IN_PIXELS)
+                    self.targetCell.x = int(self.targetCell.x / self.CELL_SIZE_IN_PIXELS)
+                    self.targetCell.y = (mousePosition[BUTTON_Y_POSITION_INDEX] - self.HEADER_HEIGHT_IN_PIXELS)
+                    self.targetCell.y = int(self.targetCell.y / self.CELL_SIZE_IN_PIXELS)
+
+                # Also, check if the click event is inside the smile boundaries
+                elif ((mousePosition[BUTTON_Y_POSITION_INDEX] >= self.smilePositionY) and
+                      (mousePosition[BUTTON_Y_POSITION_INDEX] < (self.smilePositionY + self.SMILE_HEIGHT_IN_PIXELS)) and
+                      (mousePosition[BUTTON_X_POSITION_INDEX] >= self.smilePositionX) and
+                      (mousePosition[BUTTON_X_POSITION_INDEX] < (self.smilePositionX + self.SMILE_WIDTH_IN_PIXELS))):
+
+                    self.smileButtonState = False
+
+                    # Reset the board
+                    self.boardVisibility = np.zeros((self.boardHeight, self.boardWidth))
+                    # Reset the control variables
+                    self.matchStartTimeMs = pygame.time.get_ticks()
+                    self.isFirstClick = True
+                    self.matchOngoing = True
+                    self.matchWin = False
 
                 # TODO: remove after testing - middle mouse button will close every cell
                 if (button[1]):
@@ -469,8 +527,30 @@ class MineSweeperGame:
                     rightButtonEvent = True
                     self.rightButtonState = False
 
+                mousePosition = pygame.mouse.get_pos()
+
+                # Also, check if the release event is inside the board boundaries
+                if ((mousePosition[BUTTON_Y_POSITION_INDEX] >= self.HEADER_HEIGHT_IN_PIXELS) and
+                    (mousePosition[BUTTON_Y_POSITION_INDEX] < (self.windowHeight - self.FOOTER_HEIGHT_IN_PIXELS)) and
+                    (mousePosition[BUTTON_X_POSITION_INDEX] >= self.LEFT_BORDER_WIDTH_IN_PIXELS) and
+                    (mousePosition[BUTTON_X_POSITION_INDEX] < (self.windowWidth - self.RIGHT_BORDER_WIDTH_IN_PIXELS))):
+
+                    boardEvent = True
+
+                # Also, check if the release event is inside the smile boundaries
+                elif ((mousePosition[BUTTON_Y_POSITION_INDEX] >= self.smilePositionY) and
+                      (mousePosition[BUTTON_Y_POSITION_INDEX] < (self.smilePositionY + self.SMILE_HEIGHT_IN_PIXELS)) and
+                      (mousePosition[BUTTON_X_POSITION_INDEX] >= self.smilePositionX) and
+                      (mousePosition[BUTTON_X_POSITION_INDEX] < (self.smilePositionX + self.SMILE_WIDTH_IN_PIXELS))):
+
+                    self.smileButtonState = True
+
             # In case the match has already ended, skip the game button actions
             if (self.matchOngoing == False):
+                continue
+
+            # Also, check if the event is inside the board boundaries
+            if (boardEvent == False):
                 continue
 
             # Cast the target coordinated to integers
@@ -508,8 +588,8 @@ class MineSweeperGame:
                 value = self.boardValues[targetLine, targetColumn]
 
                 if (self.boardVisibility[targetLine, targetColumn] == self.CELL_PRESSED_CLOSED_STATE):
-                    # Process the closed cell event
 
+                    # Process the closed cell event
                     if (value == self.CELL_MINE_VALUE):
                         # If the selected cell is a mine, explode it and open every other
                         self.boardVisibility[targetLine, targetColumn] = self.CELL_EXPLODED_MINE_STATE
@@ -525,8 +605,8 @@ class MineSweeperGame:
                         self.boardVisibility[targetLine, targetColumn] = self.CELL_CLOSED_STATE
                         self.openCell(targetLine, targetColumn, False)
 
-                    # And, check if the game has ended in victory
-                    self.checkVictory()
+                        # And, check if the game has ended in victory
+                        self.checkVictory()
 
                 if (self.boardVisibility[targetLine, targetColumn] == self.CELL_PRESSED_MARKED_STATE):
                     # Process the marked cell event
@@ -553,6 +633,9 @@ class MineSweeperGame:
 
                 elif (self.boardVisibility[targetLine, targetColumn] == self.CELL_MARKED_STATE):
                     self.boardVisibility[targetLine, targetColumn] = self.CELL_CLOSED_STATE
+
+                # And, check if the game has ended in victory
+                self.checkVictory()
 
     def run(self):
         """Function designed to run the game application.
